@@ -43,7 +43,7 @@ with torch.inference_mode():
         output = model.generate(**tokens, max_new_tokens=1024, do_sample=True, temperature=1.0, num_beams=5, no_repeat_ngram_size=2)
         output = output[:, tokens["input_ids"].shape[1]:]
         generated_text += tokenizer.batch_decode(output, skip_special_tokens=True)
-    
+
 print(generated_text[:5])
 
 df['gemma_outputs'] = generated_text
