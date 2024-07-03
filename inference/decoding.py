@@ -31,39 +31,32 @@ def sample_top_p(probs, p):
     return next_token
 
 
-text = ["", ""]
-max_length = 500
-eos_token_id = tokenizer.eos_token_id
-temperature: float = 0.2
-top_p = 0.9
+def generate(model, tokenizer, texts, max_length, temperature, top_p):
+    eos_token_id = tokenizer.eos_token_id
+    tokens = tokenizer.batch_encode_plus(text, 
+                                        return_tensors='pt',
+                                        padding=True,
+                                        add_special_tokens=True)
+    tokens = tokens['input_ids']
+    early_stopping = torch.zeros(output_tokens.shape[0], dtype=torch.bool)
 
-tokens = tokenizer.batch_encode_plus(text,
-                                     return_tensors="pt",
-                                     padding=True,
-                                     add_special_tokens=True)
+    for _ in range(max_length - tokens.size(1)):
+        with torch.no_grad():
+            logits = model(tokens)
+        
+        if temperature > 0:
+            probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
+            next_tokens = sample_top_p(probs, top_p)
 
-output_tokens = tokens['input_ids']
-early_stopping = torch.zeros(output_tokens.shape[0], dtype=torch.bool)
+        else:
+            next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
 
+        early_stopping = torch.logitcal_or(early_stopping,
+                                torch.tensor(eas_token_id, dtype=torch.long).expand_as(next_token_id) == next_token_id)
+        if torch.all(early_stopping):
+            print("early stopping detected")
+            break
 
-for _ in range(max_length - tokens.size(1)):
-    with torch.no_grad():
-        logits = model(output_tokens).logits
+        output_tokens = torch.cat((output_tokens, next_token_id), dim=1)
 
-    if temperature > 0:
-        probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
-        next_token = sample_top_p(probs, top_p)
-    else:
-        next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
-
-
-    early_stopping = torch.logical_or(early_stopping,
-                                     torch.tensor(eos_token_id, dtype=torch.long).expand_as(next_token_id) == next_token_id)
-    if torch.all(early_stopping):
-        print("early stopping detected")
-        break 
-
-    output_tokens = torch.cat((output_tokens, next_token_id), dim=1)
-
-generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-print(generated_text)
+        return tokenizer.batch_decode(output_tokens, skip_special_tokens=True) 
